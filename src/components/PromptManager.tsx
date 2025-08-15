@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import useAuth from '../hooks/useAuth';
+import { saveLocalPrompt, getLocalPrompts, deleteLocalPrompt, type LocalPrompt } from '../utils/indexedDB';
 
 interface Prompt {
-  id: number;
+  id?: number; // Make id optional for local prompts before saving
   title: string;
   content: string;
   is_public: boolean;
+  isLocal?: boolean; // Added to differentiate local prompts
 }
 
 const PromptManager: React.FC = () => {
@@ -21,13 +23,12 @@ const PromptManager: React.FC = () => {
 
   useEffect(() => {
     if (isAuthenticated && token) {
-      fetchPrompts();
-    } else {
-      setPrompts([]);
+      fetchBackendPrompts();
     }
+    fetchLocalPrompts();
   }, [isAuthenticated, token]);
 
-  const fetchPrompts = async () => {
+  const fetchBackendPrompts = async () => {
     if (!token) return;
     try {
       const response = await fetch(`${API_BASE_URL}/prompts`, {
@@ -37,109 +38,159 @@ const PromptManager: React.FC = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        setPrompts(data);
+        setPrompts((prevPrompts) => [...prevPrompts.filter(p => p.isLocal), ...data]);
       } else {
-        setMessage('Failed to fetch prompts.');
+        setMessage('Failed to fetch backend prompts.');
       }
     } catch (error) {
-      console.error('Error fetching prompts:', error);
-      setMessage('Network error fetching prompts.');
+      console.error('Error fetching backend prompts:', error);
+      setMessage('Network error fetching backend prompts.');
+    }
+  };
+
+  const fetchLocalPrompts = async () => {
+    try {
+      const local = await getLocalPrompts();
+      setPrompts((prevPrompts) => [...prevPrompts.filter(p => !p.isLocal), ...local.map(p => ({ ...p, isLocal: true, id: p.id }))]);
+    } catch (error) {
+      console.error('Error fetching local prompts:', error);
+      setMessage('Error fetching local prompts.');
     }
   };
 
   const handleCreatePrompt = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!token) return;
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/prompts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          title: newPromptTitle,
-          content: newPromptContent,
-          is_public: newPromptIsPublic,
-        }),
-      });
+    const promptData = {
+      title: newPromptTitle,
+      content: newPromptContent,
+      is_public: newPromptIsPublic,
+    };
 
-      if (response.ok) {
-        setMessage('Prompt created successfully!');
+    if (isAuthenticated && token) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/prompts`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(promptData),
+        });
+
+        if (response.ok) {
+          setMessage('Prompt created successfully!');
+          setNewPromptTitle('');
+          setNewPromptContent('');
+          setNewPromptIsPublic(false);
+          fetchBackendPrompts(); // Refresh the list
+        } else {
+          const errorData = await response.json();
+          setMessage(errorData.message || 'Failed to create prompt.');
+        }
+      } catch (error) {
+        console.error('Error creating prompt:', error);
+        setMessage('Network error creating prompt.');
+      }
+    } else {
+      try {
+        const id = await saveLocalPrompt(promptData);
+        setMessage('Prompt saved locally!');
         setNewPromptTitle('');
         setNewPromptContent('');
         setNewPromptIsPublic(false);
-        fetchPrompts(); // Refresh the list
-      } else {
-        const errorData = await response.json();
-        setMessage(errorData.message || 'Failed to create prompt.');
+        fetchLocalPrompts(); // Refresh the list
+      } catch (error) {
+        console.error('Error saving local prompt:', error);
+        setMessage('Failed to save local prompt.');
       }
-    } catch (error) {
-      console.error('Error creating prompt:', error);
-      setMessage('Network error creating prompt.');
     }
   };
 
   const handleUpdatePrompt = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!token || !editingPrompt) return;
+    if (!editingPrompt) return;
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/prompts/${editingPrompt.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          title: editingPrompt.title,
-          content: editingPrompt.content,
-          is_public: editingPrompt.is_public,
-        }),
-      });
+    const promptData = {
+      title: editingPrompt.title,
+      content: editingPrompt.content,
+      is_public: editingPrompt.is_public,
+    };
 
-      if (response.ok) {
-        setMessage('Prompt updated successfully!');
+    if (editingPrompt.isLocal) {
+      try {
+        await saveLocalPrompt({ ...promptData, id: editingPrompt.id });
+        setMessage('Local prompt updated successfully!');
         setEditingPrompt(null);
-        fetchPrompts(); // Refresh the list
-      } else {
-        const errorData = await response.json();
-        setMessage(errorData.message || 'Failed to update prompt.');
+        fetchLocalPrompts();
+      } catch (error) {
+        console.error('Error updating local prompt:', error);
+        setMessage('Failed to update local prompt.');
       }
-    } catch (error) {
-      console.error('Error updating prompt:', error);
-      setMessage('Network error updating prompt.');
+    } else if (isAuthenticated && token) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/prompts/${editingPrompt.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(promptData),
+        });
+
+        if (response.ok) {
+          setMessage('Prompt updated successfully!');
+          setEditingPrompt(null);
+          fetchBackendPrompts(); // Refresh the list
+        } else {
+          const errorData = await response.json();
+          setMessage(errorData.message || 'Failed to update prompt.');
+        }
+      } catch (error) {
+        console.error('Error updating prompt:', error);
+        setMessage('Network error updating prompt.');
+      }
+    } else {
+      setMessage('Please log in to update backend prompts.');
     }
   };
 
-  const handleDeletePrompt = async (id: number) => {
-    if (!token || !window.confirm('Are you sure you want to delete this prompt?')) return;
+  const handleDeletePrompt = async (id: number | undefined, isLocal: boolean | undefined) => {
+    if (!id || !window.confirm('Are you sure you want to delete this prompt?')) return;
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/prompts/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        setMessage('Prompt deleted successfully!');
-        fetchPrompts(); // Refresh the list
-      } else {
-        const errorData = await response.json();
-        setMessage(errorData.message || 'Failed to delete prompt.');
+    if (isLocal) {
+      try {
+        await deleteLocalPrompt(id);
+        setMessage('Local prompt deleted successfully!');
+        fetchLocalPrompts();
+      } catch (error) {
+        console.error('Error deleting local prompt:', error);
+        setMessage('Failed to delete local prompt.');
       }
-    } catch (error) {
-      console.error('Error deleting prompt:', error);
-      setMessage('Network error deleting prompt.');
+    } else if (isAuthenticated && token) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/prompts/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          setMessage('Prompt deleted successfully!');
+          fetchBackendPrompts(); // Refresh the list
+        } else {
+          const errorData = await response.json();
+          setMessage(errorData.message || 'Failed to delete prompt.');
+        }
+      } catch (error) {
+        console.error('Error deleting prompt:', error);
+        setMessage('Network error deleting prompt.');
+      }
+    } else {
+      setMessage('Please log in to delete backend prompts.');
     }
   };
-
-  if (!isAuthenticated) {
-    return <p>Please log in to manage your prompts.</p>;
-  }
 
   return (
     <div>
@@ -175,7 +226,11 @@ const PromptManager: React.FC = () => {
             type="checkbox"
             checked={editingPrompt ? editingPrompt.is_public : newPromptIsPublic}
             onChange={(e) => editingPrompt ? setEditingPrompt({ ...editingPrompt, is_public: e.target.checked }) : setNewPromptIsPublic(e.target.checked)}
+            disabled={!isAuthenticated} // Disable if not authenticated for backend prompts
           />
+          {!isAuthenticated && (
+            <small title="Login to make prompts public"> (Login to make prompts public)</small>
+          )}
         </div>
         <button type="submit">{editingPrompt ? 'Update Prompt' : 'Create Prompt'}</button>
         {editingPrompt && <button type="button" onClick={() => setEditingPrompt(null)}>Cancel Edit</button>}
@@ -188,11 +243,11 @@ const PromptManager: React.FC = () => {
         <ul>
           {prompts.map((prompt) => (
             <li key={prompt.id}>
-              <h4>{prompt.title}</h4>
+              <h4>{prompt.title} {prompt.isLocal && <small>(Local)</small>}</h4>
               <p>{prompt.content}</p>
               <p>Public: {prompt.is_public ? 'Yes' : 'No'}</p>
               <button onClick={() => setEditingPrompt(prompt)}>Edit</button>
-              <button onClick={() => handleDeletePrompt(prompt.id)}>Delete</button>
+              <button onClick={() => handleDeletePrompt(prompt.id, prompt.isLocal)}>Delete</button>
             </li>
           ))}
         </ul>
