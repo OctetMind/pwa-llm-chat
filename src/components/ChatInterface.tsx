@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { encrypt, decrypt } from '../utils/crypto';
-import { getEncryptedKey, getAllServiceNames } from '../utils/indexedDB';
+import { getEncryptedKey, getAllFriendlyNames } from '../utils/indexedDB';
 import { OpenAIAdapter, HuggingFaceAdapter, type LLMAdapter } from '../llm/LLMAdapter';
 
 const ChatInterface: React.FC = () => {
@@ -14,7 +15,7 @@ const ChatInterface: React.FC = () => {
   useEffect(() => {
     const fetchServices = async () => {
       try {
-        const services = await getAllServiceNames();
+        const services = await getAllFriendlyNames();
         setAvailableLlmServices(services);
       } catch (error) {
         console.error('Error fetching LLM services:', error);
@@ -39,17 +40,17 @@ const ChatInterface: React.FC = () => {
       // In a real app, this would be handled more securely, perhaps by prompting the user once.
       const encryptionPassword = "default_password";
 
-      const storedEncryptedApiKey = await getEncryptedKey(selectedLlmService);
-      if (!storedEncryptedApiKey) {
+      const storedData = await getEncryptedKey(selectedLlmService);
+      if (!storedData) {
         setMessage(`No encrypted API Key found for ${selectedLlmService}. Please set it in settings.`);
         setLoading(false);
         return;
       }
 
-      const decryptedApiKey = await decrypt(storedEncryptedApiKey, encryptionPassword);
+      const decryptedApiKey = await decrypt(storedData.encryptedKey, encryptionPassword);
 
       let adapter: LLMAdapter;
-      switch (selectedLlmService.toLowerCase()) {
+      switch (storedData.serviceType.toLowerCase()) {
         case 'openai':
         case 'chatgpt':
           adapter = new OpenAIAdapter(decryptedApiKey);
@@ -76,21 +77,28 @@ const ChatInterface: React.FC = () => {
   return (
     <div>
       <h2>Chat with LLM</h2>
-      <div>
-        <label htmlFor="llmService">Select LLM Service:</label>
-        <select
-          id="llmService"
-          value={selectedLlmService}
-          onChange={(e) => setSelectedLlmService(e.target.value)}
-        >
-          <option value="">--Select--</option>
-          {availableLlmServices.map((service) => (
-            <option key={service} value={service}>
-              {service}
-            </option>
-          ))}
-        </select>
-      </div>
+      {availableLlmServices.length === 0 ? (
+        <p style={{ color: 'orange' }}>
+          Sorry, no LLM services added. Please go to{' '}
+          <Link to="/settings">Settings</Link> to set one up.
+        </p>
+      ) : (
+        <div>
+          <div>
+            <label htmlFor="llmService">Select LLM Service:</label>
+            <select
+              id="llmService"
+              value={selectedLlmService}
+              onChange={(e) => setSelectedLlmService(e.target.value)}
+            >
+              <option value="">--Select--</option>
+              {availableLlmServices.map((service) => (
+                <option key={service} value={service}>
+                  {service}
+                </option>
+              ))}
+            </select>
+          </div>
       <div>
         <label htmlFor="prompt">Your Prompt:</label>
         <textarea
@@ -104,6 +112,21 @@ const ChatInterface: React.FC = () => {
       <button onClick={handleGenerate} disabled={loading}>
         {loading ? 'Generating...' : 'Generate Response'}
       </button>
+          <div>
+            <label htmlFor="prompt">Your Prompt:</label>
+            <textarea
+              id="prompt"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              rows={5}
+              placeholder="Type your message here..."
+            ></textarea>
+          </div>
+          <button onClick={handleGenerate} disabled={loading}>
+            {loading ? 'Generating...' : 'Generate Response'}
+          </button>
+        </div>
+      )}
       {message && <p style={{ color: 'red' }}>{message}</p>}
       {response && (
         <div>

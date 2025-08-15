@@ -5,7 +5,19 @@ import Auth from './components/Auth';
 import useAuth from './hooks/useAuth';
 
 function Home() {
-  return <h2>Home</h2>;
+  return (
+    <div>
+      <h2>Welcome to LLM Chat PWA!</h2>
+      <p>To get started, please follow these steps:</p>
+      <ol>
+        <li>Go to the "Settings" page to configure your LLM API keys.</li>
+        <li>Provide a friendly name, select the AI service type (e.g., OpenAI, HuggingFace), enter your API key, and set an encryption password.</li>
+        <li>Click "Encrypt and Save Key" to securely store your API key on your device.</li>
+        <li>Once your LLM service is set up, navigate to the "Chat" page.</li>
+        <li>Select your configured LLM service from the dropdown, enter your prompt, and generate a response!</li>
+      </ol>
+    </div>
+  );
 }
 
 import ChatInterface from './components/ChatInterface';
