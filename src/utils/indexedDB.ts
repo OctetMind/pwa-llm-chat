@@ -82,3 +82,20 @@ export async function deleteEncryptedKey(serviceName: string): Promise<void> {
     };
   });
 }
+
+export async function getAllServiceNames(): Promise<string[]> {
+  const database = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([STORE_NAME], 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.getAllKeys();
+
+    request.onsuccess = () => {
+      resolve(request.result as string[]);
+    };
+    request.onerror = (event) => {
+      const target = event.target as IDBRequest;
+      reject('Error getting all service names: ' + target.error);
+    };
+  });
+}

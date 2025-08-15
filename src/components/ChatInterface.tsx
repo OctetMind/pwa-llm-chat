@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { encrypt, decrypt } from '../utils/crypto';
-import { getEncryptedKey } from '../utils/indexedDB';
+import { getEncryptedKey, getAllServiceNames } from '../utils/indexedDB';
 import { OpenAIAdapter, HuggingFaceAdapter, type LLMAdapter } from '../llm/LLMAdapter';
 
 const ChatInterface: React.FC = () => {
@@ -9,6 +9,20 @@ const ChatInterface: React.FC = () => {
   const [response, setResponse] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [availableLlmServices, setAvailableLlmServices] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const services = await getAllServiceNames();
+        setAvailableLlmServices(services);
+      } catch (error) {
+        console.error('Error fetching LLM services:', error);
+        setMessage('Error loading available LLM services.');
+      }
+    };
+    fetchServices();
+  }, []);
 
   const handleGenerate = async () => {
     if (!selectedLlmService || !prompt) {
@@ -70,8 +84,11 @@ const ChatInterface: React.FC = () => {
           onChange={(e) => setSelectedLlmService(e.target.value)}
         >
           <option value="">--Select--</option>
-          <option value="openai">OpenAI</option>
-          <option value="huggingface">HuggingFace</option>
+          {availableLlmServices.map((service) => (
+            <option key={service} value={service}>
+              {service}
+            </option>
+          ))}
         </select>
       </div>
       <div>
