@@ -39,11 +39,12 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-export interface EncryptedKeyData {
+export interface LLMServiceData {
   friendlyName: string;
   serviceType: string;
   encryptedKey: string;
   endpoint: string | null;
+  model: string | null;
 }
 
 export async function saveEncryptedKey(data: EncryptedKeyData): Promise<void> {
@@ -61,7 +62,7 @@ export async function saveEncryptedKey(data: EncryptedKeyData): Promise<void> {
   });
 }
 
-export async function getEncryptedKey(friendlyName: string): Promise<{ serviceType: string, encryptedKey: string, endpoint?: string } | null> {
+export async function getEncryptedKey(friendlyName: string): Promise<LLMServiceData | null> {
   const database = await openDB();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([STORE_NAME], 'readonly');
@@ -70,7 +71,7 @@ export async function getEncryptedKey(friendlyName: string): Promise<{ serviceTy
 
     request.onsuccess = () => {
       if (request.result) {
-        resolve({ serviceType: request.result.serviceType, encryptedKey: request.result.encryptedKey, endpoint: request.result.endpoint });
+        resolve(request.result as LLMServiceData);
       } else {
         resolve(null);
       }

@@ -33,13 +33,15 @@ export abstract class BaseLLMAdapter implements LLMAdapter {
 
       if (!response.ok) {
         let errorDetail = `HTTP error! status: ${response.status}`;
+        let errorData = null;
         try {
-          const errorData = await response.json();
+          errorData = await response.json();
           errorDetail = errorData.error?.message || JSON.stringify(errorData);
         } catch (jsonError) {
           // If response is not JSON, use status text
           errorDetail = response.statusText;
         }
+        console.error(`Error response from ${this.getServiceName()} API:`, errorData || response.statusText);
         throw new Error(`${this.getServiceName()} API error: ${errorDetail}`);
       }
 

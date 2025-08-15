@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { encrypt, decrypt } from '../utils/crypto';
 import { getEncryptedKey, getAllFriendlyNames } from '../utils/indexedDB';
-import { OpenAIAdapter, HuggingFaceAdapter, GoogleVertexAIAdapter, AnthropicAdapter, type LLMAdapter } from '../llm';
+import { OpenAIAdapter, HuggingFaceAdapter, GoogleVertexAIAdapter, AnthropicAdapter, RequestyAIAdapter, type LLMAdapter } from '../llm';
+import type { LLMServiceData } from '../utils/indexedDB';
 
 const ChatInterface: React.FC = () => {
   const [selectedLlmService, setSelectedLlmService] = useState('');
@@ -11,6 +12,7 @@ const ChatInterface: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [availableLlmServices, setAvailableLlmServices] = useState<string[]>([]);
+  const [decryptionPassword, setDecryptionPassword] = useState(''); // New state for decryption password
 
   useEffect(() => {
     const fetchServices = async () => {
@@ -19,15 +21,14 @@ const ChatInterface: React.FC = () => {
         setAvailableLlmServices(services);
       } catch (error) {
         console.error('Error fetching LLM services:', error);
-        // Removed redundant message as it's handled by the "no services added" check
       }
     };
     fetchServices();
   }, []);
 
   const handleGenerate = async () => {
-    if (!selectedLlmService || !prompt) {
-      setMessage('Please select an LLM service and enter a prompt.');
+    if (!selectedLlmService || !prompt || !decryptionPassword) {
+      setMessage('Please select an LLM service, enter a prompt, and provide the decryption password.');
       return;
     }
 
@@ -36,38 +37,51 @@ const ChatInterface: React.FC = () => {
     setResponse('');
 
     try {
-      // For simplicity, assuming a default encryption password for now.
-      // In a real app, this would be handled more securely, perhaps by prompting the user once.
-      const encryptionPassword = "default_password";
-
-      const storedData = await getEncryptedKey(selectedLlmService);
+      const storedData = await getEncryptedKey(selectedLlmService) as LLMServiceData | null;
       if (!storedData) {
         setMessage(`No encrypted API Key found for ${selectedLlmService}. Please set it in settings.`);
         setLoading(false);
         return;
       }
 
-      const decryptedApiKey = await decrypt(storedData.encryptedKey, encryptionPassword);
+      const decryptedApiKey = await decrypt(storedData.encryptedKey, decryptionPassword); // Use decryptionPassword
 
       let adapter: LLMAdapter;
+      const config: { model?: string; endpoint?: string } = {};
+
+      if (storedData.model) {
+        config.model = storedData.model;
+      }
+      if (storedData.endpoint) {
+        config.endpoint = storedData.endpoint;
+      }
+
       switch (storedData.serviceType.toLowerCase()) {
         case 'openai':
-        case 'chatgpt': // Assuming 'chatgpt' is an alias for OpenAI
+        case 'chatgpt':
           adapter = new OpenAIAdapter(decryptedApiKey);
           break;
         case 'huggingface':
-          adapter = new HuggingFaceAdapter(decryptedApiKey, 'https://api-inference.huggingface.co/models/gpt2'); // Default HF endpoint
+          if (!config.endpoint) {
+            setMessage('Endpoint not found for Hugging Face. Please update settings.');
+            setLoading(false);
+            return;
+          }
+          adapter = new HuggingFaceAdapter(decryptedApiKey, config.endpoint);
           break;
         case 'google-vertex-ai':
-          if (!storedData.endpoint) {
+          if (!config.endpoint) {
             setMessage('Endpoint not found for Google Vertex AI. Please update settings.');
             setLoading(false);
             return;
           }
-          adapter = new GoogleVertexAIAdapter(decryptedApiKey, storedData.endpoint);
+          adapter = new GoogleVertexAIAdapter(decryptedApiKey, config.endpoint);
           break;
         case 'anthropic':
           adapter = new AnthropicAdapter(decryptedApiKey);
+          break;
+        case 'requesty-ai':
+          adapter = new RequestyAIAdapter(decryptedApiKey);
           break;
         default:
           setMessage('Unsupported LLM service.');
@@ -75,7 +89,7 @@ const ChatInterface: React.FC = () => {
           return;
       }
 
-      const llmResponse = await adapter.generate(prompt);
+      const llmResponse = await adapter.generate(prompt, config);
       setResponse(llmResponse);
     } catch (error) {
       console.error('Error during LLM generation:', error);
@@ -109,6 +123,16 @@ const ChatInterface: React.FC = () => {
                 </option>
               ))}
             </select>
+          </div>
+          <div>
+            <label htmlFor="decryptionPassword">Decryption Password:</label>
+            <input
+              id="decryptionPassword"
+              type="password"
+              value={decryptionPassword}
+              onChange={(e) => setDecryptionPassword(e.target.value)}
+              placeholder="Enter decryption password"
+            />
           </div>
       <div>
         <label htmlFor="prompt">Your Prompt:</label>

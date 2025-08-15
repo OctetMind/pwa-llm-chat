@@ -33,11 +33,7 @@ export class RequestyAIAdapter extends BaseLLMAdapter {
   }
 
   async getAvailableModels(): Promise<string[]> {
-    const response = await fetch(`${this.endpoint}/models`, {
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-      },
-    });
+    const response = await fetch('https://router.requesty.ai/v1/models');
 
     if (!response.ok) {
       throw new Error(`Failed to fetch Requesty.ai models: ${response.statusText}`);
