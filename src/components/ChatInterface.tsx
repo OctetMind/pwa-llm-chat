@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { encrypt, decrypt } from '../utils/crypto';
 import { getEncryptedKey, getAllFriendlyNames } from '../utils/indexedDB';
-import { OpenAIAdapter, HuggingFaceAdapter, type LLMAdapter } from '../llm/LLMAdapter';
+import { OpenAIAdapter, HuggingFaceAdapter, GoogleVertexAIAdapter, AnthropicAdapter, type LLMAdapter } from '../llm/LLMAdapter';
 
 const ChatInterface: React.FC = () => {
   const [selectedLlmService, setSelectedLlmService] = useState('');
@@ -19,7 +19,7 @@ const ChatInterface: React.FC = () => {
         setAvailableLlmServices(services);
       } catch (error) {
         console.error('Error fetching LLM services:', error);
-        setMessage('Error loading available LLM services.');
+        // Removed redundant message as it's handled by the "no services added" check
       }
     };
     fetchServices();
@@ -52,11 +52,22 @@ const ChatInterface: React.FC = () => {
       let adapter: LLMAdapter;
       switch (storedData.serviceType.toLowerCase()) {
         case 'openai':
-        case 'chatgpt':
+        case 'chatgpt': // Assuming 'chatgpt' is an alias for OpenAI
           adapter = new OpenAIAdapter(decryptedApiKey);
           break;
         case 'huggingface':
-          adapter = new HuggingFaceAdapter(decryptedApiKey, 'https://api-inference.huggingface.co/models/gpt2');
+          adapter = new HuggingFaceAdapter(decryptedApiKey, 'https://api-inference.huggingface.co/models/gpt2'); // Default HF endpoint
+          break;
+        case 'google-vertex-ai':
+          if (!storedData.endpoint) {
+            setMessage('Endpoint not found for Google Vertex AI. Please update settings.');
+            setLoading(false);
+            return;
+          }
+          adapter = new GoogleVertexAIAdapter(decryptedApiKey, storedData.endpoint);
+          break;
+        case 'anthropic':
+          adapter = new AnthropicAdapter(decryptedApiKey);
           break;
         default:
           setMessage('Unsupported LLM service.');
@@ -112,19 +123,6 @@ const ChatInterface: React.FC = () => {
       <button onClick={handleGenerate} disabled={loading}>
         {loading ? 'Generating...' : 'Generate Response'}
       </button>
-          <div>
-            <label htmlFor="prompt">Your Prompt:</label>
-            <textarea
-              id="prompt"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              rows={5}
-              placeholder="Type your message here..."
-            ></textarea>
-          </div>
-          <button onClick={handleGenerate} disabled={loading}>
-            {loading ? 'Generating...' : 'Generate Response'}
-          </button>
         </div>
       )}
       {message && <p style={{ color: 'red' }}>{message}</p>}

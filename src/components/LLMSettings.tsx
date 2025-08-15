@@ -1,13 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { encrypt, decrypt } from '../utils/crypto';
 import { saveEncryptedKey, getEncryptedKey } from '../utils/indexedDB';
+import { OpenAIAdapter, HuggingFaceAdapter, GoogleVertexAIAdapter, AnthropicAdapter } from '../llm';
+import type { LLMAdapter } from '../llm';
+import { getLLMServiceConfig, getAllLLMServiceTypes } from '../llm/LLMServiceFactory';
 
 const LLMSettings: React.FC = () => {
   const [friendlyName, setFriendlyName] = useState('');
   const [serviceType, setServiceType] = useState('');
   const [apiKey, setApiKey] = useState('');
+  const [endpoint, setEndpoint] = useState(''); // New state for endpoint
   const [encryptionPassword, setEncryptionPassword] = useState('');
   const [message, setMessage] = useState('');
+
+  // Memoize the formatted service types to prevent re-calculation on every render
+  const formattedServiceTypes = useMemo(() => {
+    return getAllLLMServiceTypes().map((config) => ({
+      value: config.serviceType,
+      label: config.displayName,
+    }));
+  }, []);
 
   const handleSave = async () => {
     if (!friendlyName || !serviceType || !apiKey || !encryptionPassword) {
@@ -15,9 +27,21 @@ const LLMSettings: React.FC = () => {
       return;
     }
 
+    // Validate endpoint for Google Vertex AI
+    const serviceConfig = getLLMServiceConfig(serviceType);
+    if (serviceConfig?.requiresEndpoint && !endpoint) {
+      setMessage(`Please provide an endpoint for ${serviceConfig.serviceType}.`);
+      return;
+    }
+
     try {
       const encryptedApiKey = await encrypt(apiKey, encryptionPassword);
-      await saveEncryptedKey(friendlyName, serviceType, encryptedApiKey);
+      await saveEncryptedKey({
+        friendlyName,
+        serviceType,
+        encryptedKey: encryptedApiKey,
+        endpoint: serviceConfig?.requiresEndpoint ? endpoint : null,
+      });
       setMessage('API Key encrypted and saved successfully!');
     } catch (error) {
       console.error('Encryption failed:', error);
@@ -42,6 +66,9 @@ const LLMSettings: React.FC = () => {
       setMessage(`API Key decrypted successfully: ${decryptedApiKey}`);
       setApiKey(decryptedApiKey); // Populate the API key field with decrypted value
       setServiceType(storedData.serviceType); // Populate the service type field
+      if (storedData.endpoint) {
+        setEndpoint(storedData.endpoint); // Populate the endpoint field if available
+      }
     } catch (error) {
       console.error('Decryption failed:', error);
       setMessage('Failed to decrypt API Key. Incorrect password or corrupted data.');
@@ -62,6 +89,18 @@ const LLMSettings: React.FC = () => {
           placeholder={`e.g., My ${serviceType || 'LLM'} Key`}
         />
       </div>
+      {serviceType && getLLMServiceConfig(serviceType)?.requiresEndpoint && (
+        <div>
+          <label htmlFor="endpoint">Endpoint:</label>
+          <input
+            id="endpoint"
+            type="text"
+            value={endpoint}
+            onChange={(e) => setEndpoint(e.target.value)}
+            placeholder={getLLMServiceConfig(serviceType)?.endpointPlaceholder}
+          />
+        </div>
+      )}
       <div>
         <label htmlFor="serviceType">AI Service Type:</label>
         <select
@@ -70,8 +109,11 @@ const LLMSettings: React.FC = () => {
           onChange={(e) => setServiceType(e.target.value)}
         >
           <option value="">--Select--</option>
-          <option value="openai">OpenAI</option>
-          <option value="huggingface">HuggingFace</option>
+          {formattedServiceTypes.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
         </select>
       </div>
       <div>

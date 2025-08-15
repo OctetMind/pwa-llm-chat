@@ -9,13 +9,20 @@ function openDB(): Promise<IDBDatabase> {
       return resolve(db);
     }
 
-    const request = indexedDB.open(DB_NAME, 1);
+    const request = indexedDB.open(DB_NAME, 2); // Increment DB version for schema change
 
     request.onupgradeneeded = (event) => {
       const target = event.target as IDBOpenDBRequest;
       const db = target.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'friendlyName' });
+        const store = db.createObjectStore(STORE_NAME, { keyPath: 'friendlyName' });
+        // If upgrading from version 1, ensure 'endpoint' can be stored
+        // This is handled by the new version, but explicitly adding for clarity
+        // No need to create index for endpoint as it's not searched on
+      }
+      // Ensure PROMPT_STORE_NAME is also created if upgrading from a version before it existed
+      if (!db.objectStoreNames.contains(PROMPT_STORE_NAME)) {
+        db.createObjectStore(PROMPT_STORE_NAME, { keyPath: 'id', autoIncrement: true });
       }
     };
 
@@ -32,12 +39,19 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-export async function saveEncryptedKey(friendlyName: string, serviceType: string, encryptedKey: string): Promise<void> {
+export interface EncryptedKeyData {
+  friendlyName: string;
+  serviceType: string;
+  encryptedKey: string;
+  endpoint: string | null;
+}
+
+export async function saveEncryptedKey(data: EncryptedKeyData): Promise<void> {
   const database = await openDB();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([STORE_NAME], 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
-    const request = store.put({ friendlyName, serviceType, encryptedKey });
+    const request = store.put(data);
 
     request.onsuccess = () => resolve();
     request.onerror = (event) => {
@@ -47,7 +61,7 @@ export async function saveEncryptedKey(friendlyName: string, serviceType: string
   });
 }
 
-export async function getEncryptedKey(friendlyName: string): Promise<{ serviceType: string, encryptedKey: string } | null> {
+export async function getEncryptedKey(friendlyName: string): Promise<{ serviceType: string, encryptedKey: string, endpoint?: string } | null> {
   const database = await openDB();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([STORE_NAME], 'readonly');
@@ -56,7 +70,7 @@ export async function getEncryptedKey(friendlyName: string): Promise<{ serviceTy
 
     request.onsuccess = () => {
       if (request.result) {
-        resolve({ serviceType: request.result.serviceType, encryptedKey: request.result.encryptedKey });
+        resolve({ serviceType: request.result.serviceType, encryptedKey: request.result.encryptedKey, endpoint: request.result.endpoint });
       } else {
         resolve(null);
       }
