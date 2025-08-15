@@ -1,5 +1,6 @@
 export interface LLMAdapter {
   generate(prompt: string, config?: LLMConfig): Promise<string>;
+  getAvailableModels(): Promise<string[]>;
 }
 
 export interface LLMConfig {
@@ -16,4 +17,6 @@ export interface LLMServiceConfig {
   displayName: string;
   requiresEndpoint: boolean;
   endpointPlaceholder?: string;
+  requiresModel?: boolean;
+  modelPlaceholder?: string;
 }

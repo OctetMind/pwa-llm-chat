@@ -1,9 +1,9 @@
 import { BaseLLMAdapter } from './BaseLLMAdapter';
 import type { LLMConfig } from './interfaces';
-import { OPENAI_DEFAULT_ENDPOINT, OPENAI_DEFAULT_MODEL } from './constants';
+import { REQUESTY_AI_DEFAULT_ENDPOINT } from './constants';
 
-export class OpenAIAdapter extends BaseLLMAdapter {
-  constructor(apiKey: string, endpoint: string = OPENAI_DEFAULT_ENDPOINT) {
+export class RequestyAIAdapter extends BaseLLMAdapter {
+  constructor(apiKey: string, endpoint: string = REQUESTY_AI_DEFAULT_ENDPOINT) {
     super(apiKey, endpoint);
   }
 
@@ -14,8 +14,11 @@ export class OpenAIAdapter extends BaseLLMAdapter {
   }
 
   protected prepareRequestBody(prompt: string, config?: LLMConfig): Record<string, any> {
+    if (!config?.model) {
+      throw new Error('Requesty.ai requires a model to be specified in the config.');
+    }
     return {
-      model: config?.model || OPENAI_DEFAULT_MODEL,
+      model: config.model,
       messages: [{ role: 'user', content: prompt }],
       ...config,
     };
@@ -26,18 +29,18 @@ export class OpenAIAdapter extends BaseLLMAdapter {
   }
 
   protected getServiceName(): string {
-    return 'OpenAI';
+    return 'Requesty.ai';
   }
 
   async getAvailableModels(): Promise<string[]> {
-    const response = await fetch('https://api.openai.com/v1/models', {
+    const response = await fetch(`${this.endpoint}/models`, {
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
       },
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch OpenAI models: ${response.statusText}`);
+      throw new Error(`Failed to fetch Requesty.ai models: ${response.statusText}`);
     }
 
     const data = await response.json();

@@ -24,6 +24,13 @@ const llmServiceConfigs: Record<string, LLMServiceConfig> = {
     displayName: 'Anthropic',
     requiresEndpoint: false,
   },
+  'requesty-ai': {
+    serviceType: 'requesty-ai',
+    displayName: 'Requesty.ai',
+    requiresEndpoint: false,
+    requiresModel: true,
+    modelPlaceholder: 'e.g., requesty-model-v1',
+  },
 };
 
 export function getLLMServiceConfig(serviceType: string): LLMServiceConfig | undefined {

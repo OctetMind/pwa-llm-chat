@@ -27,4 +27,11 @@ export class GoogleVertexAIAdapter extends BaseLLMAdapter {
   protected getServiceName(): string {
     return 'Google Vertex AI';
   }
+
+  async getAvailableModels(): Promise<string[]> {
+    // In a real application, this would involve querying the Google Vertex AI API
+    // to list available models for the configured project and region.
+    // Example: return ['text-bison', 'gemini-pro'];
+    return [];
+  }
 }

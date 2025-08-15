@@ -30,4 +30,20 @@ export class AnthropicAdapter extends BaseLLMAdapter {
   protected getServiceName(): string {
     return 'Anthropic';
   }
+
+  async getAvailableModels(): Promise<string[]> {
+    const response = await fetch('https://api.anthropic.com/v1/models', {
+      headers: {
+        'x-api-key': this.apiKey,
+        'anthropic-version': ANTHROPIC_API_VERSION,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch Anthropic models: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.data.map((model: any) => model.id);
+  }
 }

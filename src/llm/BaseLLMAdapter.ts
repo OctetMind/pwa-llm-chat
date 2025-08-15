@@ -14,6 +14,7 @@ export abstract class BaseLLMAdapter implements LLMAdapter {
   protected abstract parseResponse(data: any): string;
   protected abstract getHeaders(): Record<string, string>;
   protected abstract getServiceName(): string;
+  public abstract getAvailableModels(): Promise<string[]>;
 
   async generate(prompt: string, config?: LLMConfig): Promise<string> {
     const controller = new AbortController();
