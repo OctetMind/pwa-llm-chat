@@ -1,0 +1,7 @@
+{
+  "name": "pwa-llm-chat-worker",
+  "compatibility_date": "2025-08-22",
+  "assets": {
+    "directory": "./dist"
+  }
+}
