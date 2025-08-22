@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import useAuth from '../hooks/useAuth';
-import { saveLocalPrompt, getLocalPrompts, deleteLocalPrompt, type LocalPrompt } from '../utils/indexedDB';
+import { saveLocalPrompt, getLocalPrompts, deleteLocalPrompt } from '../utils/indexedDB';
 import WIPOverlay from './WIPOverlay';
 
 interface Prompt {
@@ -95,7 +95,7 @@ const PromptManager: React.FC = () => {
       }
     } else {
       try {
-        const id = await saveLocalPrompt(promptData);
+        await saveLocalPrompt(promptData);
         setMessage('Prompt saved locally!');
         setNewPromptTitle('');
         setNewPromptContent('');

@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { encrypt, decrypt } from '../utils/crypto';
+import { decrypt } from '../utils/crypto';
 import { getEncryptedKey, getAllFriendlyNames } from '../utils/indexedDB';
-import { type LLMAdapter } from '../llm';
 import { createLLMAdapter } from '../llm/LLMServiceFactory';
-import type { LLMServiceData } from '../utils/indexedDB';
 
 const ChatInterface: React.FC = () => {
   const [selectedLlmService, setSelectedLlmService] = useState('');

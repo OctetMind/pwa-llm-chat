@@ -1,6 +1,6 @@
 import { BaseLLMAdapter } from './BaseLLMAdapter';
 import type { LLMConfig } from './interfaces';
-import { REQUESTY_AI_DEFAULT_ENDPOINT, REQUESTY_AI_CHAT_COMPLETIONS_ENDPOINT } from './constants';
+import { REQUESTY_AI_CHAT_COMPLETIONS_ENDPOINT } from './constants';
 
 export class RequestyAIAdapter extends BaseLLMAdapter {
   constructor(apiKey: string, endpoint: string = REQUESTY_AI_CHAT_COMPLETIONS_ENDPOINT) {

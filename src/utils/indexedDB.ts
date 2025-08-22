@@ -15,7 +15,7 @@ function openDB(): Promise<IDBDatabase> {
       const target = event.target as IDBOpenDBRequest;
       const db = target.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const store = db.createObjectStore(STORE_NAME, { keyPath: 'friendlyName' });
+        db.createObjectStore(STORE_NAME, { keyPath: 'friendlyName' });
         // If upgrading from version 1, ensure 'endpoint' can be stored
         // This is handled by the new version, but explicitly adding for clarity
         // No need to create index for endpoint as it's not searched on

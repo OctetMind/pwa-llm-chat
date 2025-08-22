@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { encrypt, decrypt } from '../utils/crypto';
-import type { LLMAdapter } from '../llm';
 import { getLLMServiceConfig, getAllLLMServiceTypes, createLLMAdapter } from '../llm/LLMServiceFactory';
 import { saveEncryptedKey, getEncryptedKey, getAllFriendlyNames, deleteEncryptedKey } from '../utils/indexedDB';
 import type { LLMServiceData } from '../utils/indexedDB';
@@ -21,7 +20,6 @@ const LLMSettings: React.FC = () => {
   const [passwordModalTitle, setPasswordModalTitle] = useState('');
   const [passwordModalMessage, setPasswordModalMessage] = useState('');
   const [passwordModalCallback, setPasswordModalCallback] = useState<(password: string) => void>(() => () => {});
-  const [currentConnectionFriendlyName, setCurrentConnectionFriendlyName] = useState('');
   const [modelToSelectAfterFetch, setModelToSelectAfterFetch] = useState<string | null>(null);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
 
@@ -74,11 +72,7 @@ const LLMSettings: React.FC = () => {
       console.error(`Error fetching models for ${serviceType}:`, error);
       setAvailableModels([]);
       if (!modelToSelectAfterFetch) { // Only clear if no model is pending selection
-        if (!modelToSelectAfterFetch) { // Only clear if no model is pending selection
-          if (!modelToSelectAfterFetch) { // Only clear if no model is pending selection
-            setSelectedModel('');
-          }
-        }
+        setSelectedModel('');
       }
       setMessage(`Failed to fetch models for ${serviceType}. Check API Key and Endpoint.`);
       return [];
@@ -89,7 +83,7 @@ const LLMSettings: React.FC = () => {
 
   useEffect(() => {
     const serviceConfig = getLLMServiceConfig(serviceType);
-    if (llmAdapter && serviceConfig?.requiresModel && !modelToSelectAfterFetch) {
+    if (llmAdapter && serviceConfig?.requiresModel) {
       handleFetchModels();
     }
   }, [llmAdapter, serviceType]);
@@ -107,7 +101,7 @@ const LLMSettings: React.FC = () => {
       }
       setModelToSelectAfterFetch(null); // Clear the temporary state
     }
-  }, [modelToSelectAfterFetch, availableModels, serviceType]);
+  }, [modelToSelectAfterFetch, availableModels, serviceType, llmAdapter]);
 
   useEffect(() => {
     const loadSavedConnections = async () => {
@@ -184,48 +178,6 @@ const LLMSettings: React.FC = () => {
     loadSavedConnections();
   }, []); // Empty dependency array to run once on mount
 
-  const handleUseConnection = (friendlyName: string) => {
-    console.log('handleUseConnection called for:', friendlyName);
-    setCurrentConnectionFriendlyName(friendlyName);
-    setPasswordModalTitle(`Use Connection: ${friendlyName}`);
-    setPasswordModalMessage('Please enter your encryption password to use this connection:');
-    setPasswordModalCallback(() => async (password: string) => {
-      setIsPasswordModalOpen(false);
-      if (!password) {
-        setMessage('Password is required to decrypt.');
-        return;
-      }
-
-      try {
-        const storedData = await getEncryptedKey(friendlyName);
-        if (!storedData) {
-          setMessage('No encrypted API Key found for this friendly name.');
-          return;
-        }
-        console.log('Stored data retrieved:', storedData);
-
-        const decryptedApiKey = await decrypt(storedData.encryptedKey, password);
-        setMessage(`API Key decrypted successfully for ${friendlyName}`);
-        setApiKey(decryptedApiKey);
-        setServiceType(storedData.serviceType);
-        setEndpoint(storedData.endpoint || '');
-        setFriendlyName(friendlyName); // Set friendly name for the loaded connection
-        setEncryptionPassword(password); // Set password for the loaded connection
-        if (getLLMServiceConfig(storedData.serviceType)?.requiresModel) {
-          console.log('Service requires model, setting modelToSelectAfterFetch:', storedData.model);
-          setModelToSelectAfterFetch(storedData.model); // Store model to select after fetch
-        } else {
-          console.log('Service does not require model, setting selected model directly:', storedData.model);
-          setSelectedModel(storedData.model || '');
-        }
-      } catch (error) {
-        console.error('Decryption failed:', error);
-        setMessage('Failed to decrypt API Key. Incorrect password or corrupted data.');
-      }
-    });
-    setIsPasswordModalOpen(true);
-  };
-
   const handleDeleteConnection = async (friendlyName: string) => {
     if (window.confirm(`Are you sure you want to delete the connection "${friendlyName}"?`)) {
       try {
@@ -241,7 +193,6 @@ const LLMSettings: React.FC = () => {
 
   const handleEditConnection = (friendlyName: string) => {
     console.log('handleEditConnection called for:', friendlyName);
-    setCurrentConnectionFriendlyName(friendlyName);
     setPasswordModalTitle(`Edit Connection: ${friendlyName}`);
     setPasswordModalMessage('Please enter your encryption password to edit this connection:');
     setPasswordModalCallback(() => async (password: string) => {
