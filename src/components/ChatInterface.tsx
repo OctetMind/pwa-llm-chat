@@ -104,19 +104,19 @@ const ChatInterface: React.FC = () => {
               placeholder="Enter decryption password"
             />
           </div>
-      <div>
-        <label htmlFor="prompt">Your Prompt:</label>
-        <textarea
-          id="prompt"
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          rows={5}
-          placeholder="Type your message here..."
-        ></textarea>
-      </div>
-      <button onClick={handleGenerate} disabled={loading}>
-        {loading ? 'Generating...' : 'Generate Response'}
-      </button>
+          <div>
+            <label htmlFor="prompt">Your Prompt:</label>
+            <textarea
+              id="prompt"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              rows={5}
+              placeholder="Type your message here..."
+            ></textarea>
+          </div>
+          <button onClick={handleGenerate} disabled={loading}>
+            {loading ? 'Generating...' : 'Generate Response'}
+          </button>
         </div>
       )}
       {message && <p style={{ color: 'red' }}>{message}</p>}

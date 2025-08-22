@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import useAuth from '../hooks/useAuth';
 import { saveLocalPrompt, getLocalPrompts, deleteLocalPrompt, type LocalPrompt } from '../utils/indexedDB';
+import WIPOverlay from './WIPOverlay';
 
 interface Prompt {
   id?: number; // Make id optional for local prompts before saving
@@ -193,65 +194,68 @@ const PromptManager: React.FC = () => {
   };
 
   return (
-    <div>
-      <h2>Your Prompts</h2>
-      {message && <p>{message}</p>}
+    <div style={{ position: 'relative' }}>
+      <WIPOverlay />
+      <div>
+        <h2>Your Prompts (WIP)</h2>
+        {message && <p>{message}</p>}
 
-      <h3>{editingPrompt ? 'Edit Prompt' : 'Create New Prompt'}</h3>
-      <form onSubmit={editingPrompt ? handleUpdatePrompt : handleCreatePrompt}>
-        <div>
-          <label htmlFor="promptTitle">Title:</label>
-          <input
-            id="promptTitle"
-            type="text"
-            value={editingPrompt ? editingPrompt.title : newPromptTitle}
-            onChange={(e) => editingPrompt ? setEditingPrompt({ ...editingPrompt, title: e.target.value }) : setNewPromptTitle(e.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="promptContent">Content:</label>
-          <textarea
-            id="promptContent"
-            value={editingPrompt ? editingPrompt.content : newPromptContent}
-            onChange={(e) => editingPrompt ? setEditingPrompt({ ...editingPrompt, content: e.target.value }) : setNewPromptContent(e.target.value)}
-            rows={5}
-            required
-          ></textarea>
-        </div>
-        <div>
-          <label htmlFor="isPublic">Public:</label>
-          <input
-            id="isPublic"
-            type="checkbox"
-            checked={editingPrompt ? editingPrompt.is_public : newPromptIsPublic}
-            onChange={(e) => editingPrompt ? setEditingPrompt({ ...editingPrompt, is_public: e.target.checked }) : setNewPromptIsPublic(e.target.checked)}
-            disabled={!isAuthenticated} // Disable if not authenticated for backend prompts
-          />
-          {!isAuthenticated && (
-            <small title="Login to make prompts public"> (Login to make prompts public)</small>
-          )}
-        </div>
-        <button type="submit">{editingPrompt ? 'Update Prompt' : 'Create Prompt'}</button>
-        {editingPrompt && <button type="button" onClick={() => setEditingPrompt(null)}>Cancel Edit</button>}
-      </form>
+        <h3>{editingPrompt ? 'Edit Prompt' : 'Create New Prompt'}</h3>
+        <form onSubmit={editingPrompt ? handleUpdatePrompt : handleCreatePrompt}>
+          <div>
+            <label htmlFor="promptTitle">Title:</label>
+            <input
+              id="promptTitle"
+              type="text"
+              value={editingPrompt ? editingPrompt.title : newPromptTitle}
+              onChange={(e) => editingPrompt ? setEditingPrompt({ ...editingPrompt, title: e.target.value }) : setNewPromptTitle(e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <label htmlFor="promptContent">Content:</label>
+            <textarea
+              id="promptContent"
+              value={editingPrompt ? editingPrompt.content : newPromptContent}
+              onChange={(e) => editingPrompt ? setEditingPrompt({ ...editingPrompt, content: e.target.value }) : setNewPromptContent(e.target.value)}
+              rows={5}
+              required
+            ></textarea>
+          </div>
+          <div>
+            <label htmlFor="isPublic">Public:</label>
+            <input
+              id="isPublic"
+              type="checkbox"
+              checked={editingPrompt ? editingPrompt.is_public : newPromptIsPublic}
+              onChange={(e) => editingPrompt ? setEditingPrompt({ ...editingPrompt, is_public: e.target.checked }) : setNewPromptIsPublic(e.target.checked)}
+              disabled={!isAuthenticated} // Disable if not authenticated for backend prompts
+            />
+            {!isAuthenticated && (
+              <small title="Login to make prompts public"> (Login to make prompts public)</small>
+            )}
+          </div>
+          <button type="submit">{editingPrompt ? 'Update Prompt' : 'Create Prompt'}</button>
+          {editingPrompt && <button type="button" onClick={() => setEditingPrompt(null)}>Cancel Edit</button>}
+        </form>
 
-      <h3>All Prompts</h3>
-      {prompts.length === 0 ? (
-        <p>No prompts found. Create one above!</p>
-      ) : (
-        <ul>
-          {prompts.map((prompt) => (
-            <li key={prompt.id}>
-              <h4>{prompt.title} {prompt.isLocal && <small>(Local)</small>}</h4>
-              <p>{prompt.content}</p>
-              <p>Public: {prompt.is_public ? 'Yes' : 'No'}</p>
-              <button onClick={() => setEditingPrompt(prompt)}>Edit</button>
-              <button onClick={() => handleDeletePrompt(prompt.id, prompt.isLocal)}>Delete</button>
-            </li>
-          ))}
-        </ul>
-      )}
+        <h3>All Prompts</h3>
+        {prompts.length === 0 ? (
+          <p>No prompts found. Create one above!</p>
+        ) : (
+          <ul>
+            {prompts.map((prompt) => (
+              <li key={prompt.id}>
+                <h4>{prompt.title} {prompt.isLocal && <small>(Local)</small>}</h4>
+                <p>{prompt.content}</p>
+                <p>Public: {prompt.is_public ? 'Yes' : 'No'}</p>
+                <button onClick={() => setEditingPrompt(prompt)}>Edit</button>
+                <button onClick={() => handleDeletePrompt(prompt.id, prompt.isLocal)}>Delete</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 };

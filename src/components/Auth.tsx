@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import useAuth from '../hooks/useAuth';
+import WIPOverlay from './WIPOverlay';
 
 const Auth: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -44,38 +45,41 @@ const Auth: React.FC = () => {
   };
 
   return (
-    <div>
-      <h2>{isLogin ? 'Login' : 'Register'}</h2>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="username">Username:</label>
-          <input
-            id="username"
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="password">Password:</label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-        <button type="submit">{isLogin ? 'Login' : 'Register'}</button>
-      </form>
-      <p>
-        {isLogin ? "Don't have an account?" : "Already have an account?"}{' '}
-        <button onClick={() => setIsLogin(!isLogin)}>
-          {isLogin ? 'Register' : 'Login'}
-        </button>
-      </p>
-      {message && <p>{message}</p>}
+    <div style={{ position: 'relative' }}>
+      <WIPOverlay />
+      <div>
+        <h2>{isLogin ? 'Login' : 'Register'} (WIP)</h2>
+        <form onSubmit={handleSubmit}>
+          <div>
+            <label htmlFor="username">Username:</label>
+            <input
+              id="username"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <label htmlFor="password">Password:</label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          <button type="submit">{isLogin ? 'Login' : 'Register'}</button>
+        </form>
+        <p>
+          {isLogin ? "Don't have an account?" : "Already have an account?"}{' '}
+          <button onClick={() => setIsLogin(!isLogin)}>
+            {isLogin ? 'Register' : 'Login'}
+          </button>
+        </p>
+        {message && <p>{message}</p>}
+      </div>
     </div>
   );
 };
