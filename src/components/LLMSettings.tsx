@@ -120,7 +120,7 @@ const LLMSettings: React.FC = () => {
     }
 
     try {
-      const storedData = await getEncryptedKey(friendlyName) as LLMServiceData | null;
+      const storedData = await getEncryptedKey(friendlyName);
       if (!storedData) {
         setMessage('No encrypted API Key found for this friendly name.');
         return;

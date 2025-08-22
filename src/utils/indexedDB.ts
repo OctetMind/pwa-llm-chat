@@ -47,7 +47,7 @@ export interface LLMServiceData {
   model: string | null;
 }
 
-export async function saveEncryptedKey(data: EncryptedKeyData): Promise<void> {
+export async function saveEncryptedKey(data: LLMServiceData): Promise<void> {
   const database = await openDB();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([STORE_NAME], 'readwrite');

@@ -37,7 +37,7 @@ const ChatInterface: React.FC = () => {
     setResponse('');
 
     try {
-      const storedData = await getEncryptedKey(selectedLlmService) as LLMServiceData | null;
+      const storedData = await getEncryptedKey(selectedLlmService);
       if (!storedData) {
         setMessage(`No encrypted API Key found for ${selectedLlmService}. Please set it in settings.`);
         setLoading(false);
