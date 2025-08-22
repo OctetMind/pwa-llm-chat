@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { encrypt, decrypt } from '../utils/crypto';
 import { getEncryptedKey, getAllFriendlyNames } from '../utils/indexedDB';
-import { OpenAIAdapter, HuggingFaceAdapter, GoogleVertexAIAdapter, AnthropicAdapter, RequestyAIAdapter, type LLMAdapter } from '../llm';
+import { type LLMAdapter } from '../llm';
+import { createLLMAdapter } from '../llm/LLMServiceFactory';
 import type { LLMServiceData } from '../utils/indexedDB';
 
 const ChatInterface: React.FC = () => {
@@ -46,47 +47,16 @@ const ChatInterface: React.FC = () => {
 
       const decryptedApiKey = await decrypt(storedData.encryptedKey, decryptionPassword); // Use decryptionPassword
 
-      let adapter: LLMAdapter;
-      const config: { model?: string; endpoint?: string } = {};
+      const adapter = createLLMAdapter(storedData.serviceType, decryptedApiKey, storedData.endpoint || '');
+      if (!adapter) {
+        setMessage('Unsupported LLM service or missing configuration.');
+        setLoading(false);
+        return;
+      }
 
+      const config: { model?: string } = {};
       if (storedData.model) {
         config.model = storedData.model;
-      }
-      if (storedData.endpoint) {
-        config.endpoint = storedData.endpoint;
-      }
-
-      switch (storedData.serviceType.toLowerCase()) {
-        case 'openai':
-        case 'chatgpt':
-          adapter = new OpenAIAdapter(decryptedApiKey);
-          break;
-        case 'huggingface':
-          if (!config.endpoint) {
-            setMessage('Endpoint not found for Hugging Face. Please update settings.');
-            setLoading(false);
-            return;
-          }
-          adapter = new HuggingFaceAdapter(decryptedApiKey, config.endpoint);
-          break;
-        case 'google-vertex-ai':
-          if (!config.endpoint) {
-            setMessage('Endpoint not found for Google Vertex AI. Please update settings.');
-            setLoading(false);
-            return;
-          }
-          adapter = new GoogleVertexAIAdapter(decryptedApiKey, config.endpoint);
-          break;
-        case 'anthropic':
-          adapter = new AnthropicAdapter(decryptedApiKey);
-          break;
-        case 'requesty-ai':
-          adapter = new RequestyAIAdapter(decryptedApiKey);
-          break;
-        default:
-          setMessage('Unsupported LLM service.');
-          setLoading(false);
-          return;
       }
 
       const llmResponse = await adapter.generate(prompt, config);

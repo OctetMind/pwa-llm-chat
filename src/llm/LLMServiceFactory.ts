@@ -53,7 +53,7 @@ export function createLLMAdapter(serviceType: string, apiKey: string, endpoint: 
     return undefined;
   }
 
-  const adapterApiKey = serviceConfig.requiresApiKeyForModels ? apiKey : '';
+  const adapterApiKey = apiKey;
 
   switch (serviceType.toLowerCase()) {
     case 'openai':
