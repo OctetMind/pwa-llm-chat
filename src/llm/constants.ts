@@ -9,4 +9,4 @@ export const ANTHROPIC_API_VERSION = '2023-06-01';
 
 export const GOOGLE_VERTEX_AI_DEFAULT_ENDPOINT = 'https://us-central1-aiplatform.googleapis.com/v1/projects/YOUR_PROJECT_ID/locations/us-central1/publishers/google/models/text-bison:predict';
 
-export const REQUESTY_AI_DEFAULT_ENDPOINT = 'https://api.requesty.ai/v1/chat/completions';
+export const REQUESTY_AI_DEFAULT_ENDPOINT = 'https://api.requesty.ai';

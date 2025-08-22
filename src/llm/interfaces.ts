@@ -19,4 +19,5 @@ export interface LLMServiceConfig {
   endpointPlaceholder?: string;
   requiresModel?: boolean;
   modelPlaceholder?: string;
+  requiresApiKeyForModels?: boolean; // New property
 }

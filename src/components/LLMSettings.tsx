@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { encrypt, decrypt } from '../utils/crypto';
-import { OpenAIAdapter, HuggingFaceAdapter, GoogleVertexAIAdapter, AnthropicAdapter, RequestyAIAdapter } from '../llm';
 import type { LLMAdapter } from '../llm';
-import { getLLMServiceConfig, getAllLLMServiceTypes } from '../llm/LLMServiceFactory';
-import { saveEncryptedKey, getEncryptedKey } from '../utils/indexedDB';
+import { getLLMServiceConfig, getAllLLMServiceTypes, createLLMAdapter } from '../llm/LLMServiceFactory';
+import { saveEncryptedKey, getEncryptedKey, getAllFriendlyNames, deleteEncryptedKey } from '../utils/indexedDB';
 import type { LLMServiceData } from '../utils/indexedDB';
+import useDebounce from '../hooks/useDebounce';
 
 const LLMSettings: React.FC = () => {
   const [friendlyName, setFriendlyName] = useState('');
@@ -15,6 +15,9 @@ const LLMSettings: React.FC = () => {
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [encryptionPassword, setEncryptionPassword] = useState('');
   const [message, setMessage] = useState('');
+  const [savedConnections, setSavedConnections] = useState<LLMServiceData[]>([]);
+
+  const debouncedApiKey = useDebounce(apiKey, 500); // Debounce API key input
 
   const formattedServiceTypes = useMemo(() => {
     return getAllLLMServiceTypes().map((config) => ({
@@ -23,62 +26,65 @@ const LLMSettings: React.FC = () => {
     }));
   }, []);
 
+  const llmAdapter = useMemo(() => {
+    if (!serviceType) {
+      return undefined;
+    }
+
+    const serviceConfig = getLLMServiceConfig(serviceType);
+    if (!serviceConfig?.requiresModel) {
+      return undefined;
+    }
+
+    // Check if API key is required for fetching models and if it's missing
+    if (serviceConfig?.requiresApiKeyForModels && !debouncedApiKey) { // Use debounced API key here
+      setMessage(`API Key is required for ${serviceConfig.displayName} to fetch models.`);
+      return undefined;
+    }
+
+    return createLLMAdapter(serviceType, debouncedApiKey, endpoint); // Use debounced API key here
+  }, [serviceType, debouncedApiKey, endpoint]); // Add debouncedApiKey to dependencies
+
+  const handleFetchModels = async () => {
+    if (!llmAdapter || availableModels.length > 0) { // Don't refetch if models are already available
+      setAvailableModels([]);
+      setSelectedModel('');
+      return;
+    }
+
+    try {
+      const models = await llmAdapter.getAvailableModels();
+      setAvailableModels(models);
+      if (models.length > 0 && !models.includes(selectedModel)) {
+        setSelectedModel(models[0]);
+      }
+    } catch (error) {
+      console.error(`Error fetching models for ${serviceType}:`, error);
+      setAvailableModels([]);
+      setSelectedModel('');
+      setMessage(`Failed to fetch models for ${serviceType}. Check API Key and Endpoint.`);
+    }
+  };
+
   useEffect(() => {
-    const fetchModels = async () => {
-      if (!serviceType || !apiKey) {
-        setAvailableModels([]);
-        setSelectedModel('');
-        return;
-      }
-
-      const serviceConfig = getLLMServiceConfig(serviceType);
-      if (!serviceConfig?.requiresModel) {
-        setAvailableModels([]);
-        setSelectedModel('');
-        return;
-      }
-
-      let adapter: LLMAdapter | undefined;
+    const loadSavedConnections = async () => {
       try {
-        switch (serviceType.toLowerCase()) {
-          case 'openai':
-            adapter = new OpenAIAdapter(apiKey);
-            break;
-          case 'huggingface':
-            if (!endpoint) return; // Endpoint is required for HuggingFace
-            adapter = new HuggingFaceAdapter(apiKey, endpoint);
-            break;
-          case 'google-vertex-ai':
-            if (!endpoint) return; // Endpoint is required for Google Vertex AI
-            adapter = new GoogleVertexAIAdapter(apiKey, endpoint);
-            break;
-          case 'anthropic':
-            adapter = new AnthropicAdapter(apiKey);
-            break;
-          case 'requesty-ai':
-            adapter = new RequestyAIAdapter(apiKey);
-            break;
-          default:
-            break;
-        }
-
-        if (adapter) {
-          const models = await adapter.getAvailableModels();
-          setAvailableModels(models);
-          if (models.length > 0 && !models.includes(selectedModel)) {
-            setSelectedModel(models[0]);
+        const names = await getAllFriendlyNames();
+        const connections: LLMServiceData[] = [];
+        for (const name of names) {
+          const data = await getEncryptedKey(name as string);
+          if (data) {
+            connections.push(data);
           }
         }
+        setSavedConnections(connections);
       } catch (error) {
-        console.error(`Error fetching models for ${serviceType}:`, error);
-        setAvailableModels([]);
-        setSelectedModel('');
-        setMessage(`Failed to fetch models for ${serviceType}. Check API Key and Endpoint.`);
+        console.error('Error loading saved connections:', error);
+        setMessage('Failed to load saved connections.');
       }
     };
-
-    fetchModels();
-  }, [serviceType, apiKey, endpoint, selectedModel]);
+    loadSavedConnections();
+  }, []); // Empty dependency array to run once on mount
 
   const handleSave = async () => {
     if (!friendlyName || !serviceType || !apiKey || !encryptionPassword) {
@@ -107,9 +113,100 @@ const LLMSettings: React.FC = () => {
       };
       await saveEncryptedKey(dataToSave);
       setMessage('API Key and settings encrypted and saved successfully!');
+      loadSavedConnections(); // Refresh the list after saving
     } catch (error) {
       console.error('Encryption failed:', error);
       setMessage('Failed to encrypt API Key and settings. Check console for details.');
+    }
+  };
+
+  const loadSavedConnections = async () => {
+    try {
+      const names = await getAllFriendlyNames();
+      const connections: LLMServiceData[] = [];
+      for (const name of names) {
+        const data = await getEncryptedKey(name as string);
+        if (data) {
+          connections.push(data);
+        }
+      }
+      setSavedConnections(connections);
+    } catch (error) {
+      console.error('Error loading saved connections:', error);
+      setMessage('Failed to load saved connections.');
+    }
+  };
+
+  useEffect(() => {
+    loadSavedConnections();
+  }, []); // Empty dependency array to run once on mount
+
+  const handleUseConnection = async (friendlyName: string) => {
+    const password = prompt('Please enter your encryption password to use this connection:');
+    if (!password) {
+      setMessage('Password is required to decrypt.');
+      return;
+    }
+
+    try {
+      const storedData = await getEncryptedKey(friendlyName);
+      if (!storedData) {
+        setMessage('No encrypted API Key found for this friendly name.');
+        return;
+      }
+
+      const decryptedApiKey = await decrypt(storedData.encryptedKey, password);
+      setMessage(`API Key decrypted successfully for ${friendlyName}`);
+      setApiKey(decryptedApiKey);
+      setServiceType(storedData.serviceType);
+      setEndpoint(storedData.endpoint || '');
+      setSelectedModel(storedData.model || '');
+      setFriendlyName(friendlyName); // Set friendly name for the loaded connection
+      setEncryptionPassword(password); // Set password for the loaded connection
+    } catch (error) {
+      console.error('Decryption failed:', error);
+      setMessage('Failed to decrypt API Key. Incorrect password or corrupted data.');
+    }
+  };
+
+  const handleDeleteConnection = async (friendlyName: string) => {
+    if (window.confirm(`Are you sure you want to delete the connection "${friendlyName}"?`)) {
+      try {
+        await deleteEncryptedKey(friendlyName);
+        setMessage(`Connection "${friendlyName}" deleted successfully.`);
+        loadSavedConnections(); // Refresh the list after deletion
+      } catch (error) {
+        console.error('Error deleting connection:', error);
+        setMessage(`Failed to delete connection "${friendlyName}".`);
+      }
+    }
+  };
+
+  const handleEditConnection = async (friendlyName: string) => {
+    const password = prompt('Please enter your encryption password to edit this connection:');
+    if (!password) {
+      setMessage('Password is required to decrypt for editing.');
+      return;
+    }
+
+    try {
+      const storedData = await getEncryptedKey(friendlyName);
+      if (!storedData) {
+        setMessage('No encrypted API Key found for this friendly name.');
+        return;
+      }
+
+      const decryptedApiKey = await decrypt(storedData.encryptedKey, password);
+      setMessage(`Connection "${friendlyName}" loaded for editing.`);
+      setFriendlyName(friendlyName);
+      setServiceType(storedData.serviceType);
+      setApiKey(decryptedApiKey);
+      setEndpoint(storedData.endpoint || '');
+      setSelectedModel(storedData.model || '');
+      setEncryptionPassword(password);
+    } catch (error) {
+      console.error('Decryption failed for editing:', error);
+      setMessage('Failed to decrypt API Key for editing. Incorrect password or corrupted data.');
     }
   };
 
@@ -203,6 +300,7 @@ const LLMSettings: React.FC = () => {
           {availableModels.length === 0 && apiKey && serviceType && (
             <p style={{ color: 'orange' }}>No models found. Check API Key and Endpoint.</p>
           )}
+          <button onClick={handleFetchModels} disabled={!llmAdapter}>Fetch Models</button>
         </div>
       )}
       <div>
@@ -228,6 +326,22 @@ const LLMSettings: React.FC = () => {
       <button onClick={handleSave}>Encrypt and Save Key</button>
       <button onClick={handleLoadAndDecrypt}>Load and Decrypt Key</button>
       {message && <p>{message}</p>}
+
+      <h3>Saved LLM Connections</h3>
+      {savedConnections.length === 0 ? (
+        <p>No saved connections found.</p>
+      ) : (
+        <ul>
+          {savedConnections.map((connection) => (
+            <li key={connection.friendlyName}>
+              {connection.friendlyName} ({connection.serviceType})
+              <button onClick={() => handleUseConnection(connection.friendlyName)}>Use</button>
+              <button onClick={() => handleEditConnection(connection.friendlyName)}>Edit</button>
+              <button onClick={() => handleDeleteConnection(connection.friendlyName)}>Delete</button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 };

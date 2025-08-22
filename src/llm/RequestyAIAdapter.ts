@@ -33,10 +33,20 @@ export class RequestyAIAdapter extends BaseLLMAdapter {
   }
 
   async getAvailableModels(): Promise<string[]> {
-    const response = await fetch('https://router.requesty.ai/v1/models');
+    const modelsEndpoint = `https://router.requesty.ai/v1/models`;
+    const response = await fetch(modelsEndpoint, {
+      headers: this.getHeaders(),
+    });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch Requesty.ai models: ${response.statusText}`);
+      let errorDetail = `HTTP error! status: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorDetail = errorData.error?.message || JSON.stringify(errorData);
+      } catch (jsonError) {
+        errorDetail = response.statusText;
+      }
+      throw new Error(`Failed to fetch Requesty.ai models: ${errorDetail}`);
     }
 
     const data = await response.json();
